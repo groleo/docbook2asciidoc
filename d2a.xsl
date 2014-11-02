@@ -1282,11 +1282,11 @@ pass:[<xsl:copy-of select="."/>]
   <xsl:template match="calloutlist">
     <xsl:choose>
       <!-- Calloutlist points to an example -->
-      <xsl:when test="callout/id(@arearefs)/ancestor::example">
+      <xsl:when test="callout/@arearefs/ancestor::example">
         <xsl:choose>
           <!-- When corresponding code block has inlines (besides co) and will be output as Docbook passthrough,
           also output calloutlist as Docbook passthrough-->
-          <xsl:when test="callout/id(@arearefs)/parent::*[*[not(self::co)]]">
+          <xsl:when test="callout/id/@arearefs/parent::*[*[not(self::co)]]">
 ++++++++++++++++++++++++++++++++++++++
 <xsl:copy-of select="."/>
 ++++++++++++++++++++++++++++++++++++++
@@ -1294,7 +1294,7 @@ pass:[<xsl:copy-of select="."/>]
 </xsl:when>
           <!-- When corresponding code block isn't in same section as calloutlist and will be output as Docbook passthrough,
           also output calloutlist as Docbook passthrough.-->
-          <xsl:when test="callout/id(@arearefs)/parent::*/parent::example/parent::node() != self::calloutlist/parent::node()">
+          <xsl:when test="callout/id/@arearefs/parent::*/parent::example/parent::node() != self::calloutlist/parent::node()">
 ++++++++++++++++++++++++++++++++++++++
 <xsl:copy-of select="."/>
 ++++++++++++++++++++++++++++++++++++++
