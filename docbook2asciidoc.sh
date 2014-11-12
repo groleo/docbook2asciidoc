@@ -13,6 +13,9 @@ DIR=$(cd -P -- "$(dirname -- "$0")" && pwd -P)
 
 convert()
 {
+  if [ -n "$PROXY_HOST" -a -n "$PROXY_PORT" ]; then
+    PROXY="-Dhttp.proxyHost=$PROXY_HOST -Dhttp.proxyPort=$PROXY_PORT"
+  fi
   CMD="find $SCAN_DIR -name *.$EXT"
   if [ $RECURSE == "0" ]; then
     CMD="find $SCAN_DIR -maxdepth 2 -name *.$EXT"
@@ -22,9 +25,6 @@ convert()
   for xml in `$CMD` ; do
     output_filename=$OUT_DIR/`basename ${xml/.$EXT/.$OEXT}`
     echo "Processing $xml -> $output_filename"
-    if [ -n "$PROXY_HOST" -a -n "$PROXY_PORT" ]; then
-      PROXY="-Dhttp.proxyHost=$PROXY_HOST -Dhttp.proxyPort=$PROXY_PORT"
-    fi
     java $PROXY -jar $DIR/saxon9he.jar -s $xml -o $output_filename $DIR/d2a.xsl
     fname=$(basename $xml)
     mv $OUT_DIR/book-docinfo.xml $OUT_DIR/${fname%.*}-docinfo.xml
