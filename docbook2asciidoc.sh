@@ -1,41 +1,9 @@
-#!/bin/bash
-
-REQUIRED_BASH_VERSION=3.0.0
-PROXY_HOST=
-PROXY_PORT=
-
-if [[ $BASH_VERSION < $REQUIRED_BASH_VERSION ]]; then
-  echo "You must use Bash version 3 or newer to run this script"
-  exit
-fi
-
-DIR=$(cd -P -- "$(dirname -- "$0")" && pwd -P)
-
-convert()
-{
-  if [ -n "$PROXY_HOST" -a -n "$PROXY_PORT" ]; then
-    PROXY="-Dhttp.proxyHost=$PROXY_HOST -Dhttp.proxyPort=$PROXY_PORT"
-  fi
-  CMD="find $SCAN_DIR -name *.$EXT"
-  if [ $RECURSE == "0" ]; then
-    CMD="find $SCAN_DIR -maxdepth 2 -name *.$EXT"
-  fi
-  mkdir -p $OUT_DIR
-
-  for xml in `$CMD` ; do
-    output_filename=$OUT_DIR/`basename ${xml/.$EXT/.$OEXT}`
-    echo "Processing $xml -> $output_filename"
-    java $PROXY -jar $DIR/saxon9he.jar -s $xml -o $output_filename $DIR/d2a.xsl
-    fname=$(basename $xml)
-    mv $OUT_DIR/book-docinfo.xml $OUT_DIR/${fname%.*}-docinfo.xml
-    echo
-  done
-}
+#! /bin/bash
 
 usage()
 {
 cat << EOF
-usage: $0 options
+usage: $0 OPTIONS
 
 This script allows primitive batching of docbook to asciidoc conversion
 
@@ -45,6 +13,8 @@ OPTIONS:
    -o      Output extension [default:'asciidoc']
    -O      Output directory [default:'output']
    -r      Enable recusive scanning [default:not recursive]
+   -F      Source file to scan
+   -T      Target file to output
    -H      proxy Host
    -P      proxy Port
 
@@ -52,20 +22,48 @@ OPTIONS:
 EOF
 }
 
-trap 'exit 0' SIGINT
+
+convert_file() {
+    input=$1
+    output=$2
+    echo "Processing $input -> $output"
+    java $PROXY -jar $DIR/saxon9he.jar -s $input -o $output $DIR/d2a.xsl
+    fname=$(basename $input)
+    dname=$(dirname $output)
+    mv $dname/book-docinfo.xml $dname/${fname%.*}-docinfo.xml
+}
+
+convert_dir()
+{
+  CMD="find $SCAN_DIR -name *.$EXT"
+  if [ $RECURSE == "0" ]; then
+    CMD="find $SCAN_DIR -maxdepth 2 -name *.$EXT"
+  fi
+  mkdir -p $OUT_DIR
+
+  for xml in `$CMD` ; do
+    convert_file $xml $OUT_DIR/`basename ${xml/.$EXT/.$OEXT}`
+    echo
+  done
+}
 
 if [ $# -eq 0 ]; then
   usage
   exit 0
 fi
 
+PROXY_HOST=
+PROXY_PORT=
+FROM=
+TO=
+DIR=$(cd -P -- "$(dirname -- "$0")" && pwd -P)
 SCAN_DIR=`pwd`
 RECURSE="0"
 EXT="xml"
 OEXT="asciidoc"
 OUT_DIR="output"
 
-while getopts “hrx:o:s:O:H:P:” OPTION
+while getopts “hrx:o:s:O:H:P:F:T:” OPTION
 
 do
      case $OPTION in
@@ -94,6 +92,12 @@ do
          P)
             PROXY_PORT=$OPTARG
            ;;
+         F)
+            FROM=$OPTARG
+           ;;
+         T)
+            TO=$OPTARG
+           ;;
          [?])
              usage
              exit
@@ -101,4 +105,8 @@ do
      esac
 done
 
-convert
+if [ -n "$PROXY_HOST" -a -n "$PROXY_PORT" ]; then
+    PROXY="-Dhttp.proxyHost=$PROXY_HOST -Dhttp.proxyPort=$PROXY_PORT"
+fi
+convert_file $FROM $TO
+#convert_dir
