@@ -7,12 +7,6 @@
   
 <!-- Mapping to allow use of XML reserved chars in AsciiDoc markup elements, e.g., angle brackets for cross-references --> 
 <xsl:character-map name="xml-reserved-chars">
-  <xsl:output-character character="&#xE801;" string="&lt;"/>
-  <xsl:output-character character="&#xE802;" string="&gt;"/>
-  <xsl:output-character character="&#xE803;" string="&amp;"/>
-  <xsl:output-character character='“' string="&amp;ldquo;"/>
-  <xsl:output-character character='”' string="&amp;rdquo;"/>
-  <xsl:output-character character="’" string="&amp;rsquo;"/>
 </xsl:character-map>
 
 <xsl:output method="xml" omit-xml-declaration="yes" use-character-maps="xml-reserved-chars"/>
@@ -639,8 +633,7 @@
   <!-- Simple processing of attribution elements, placing a space between each
        and skipping <citetitle>, which is handled separately below -->
   <xsl:for-each select="attribution/text()|attribution//*[not(*)][not(self::citetitle)]">
-    <!--Output text as is, except escape commas as &#44; entities for 
-	proper AsciiDoc attribute processing -->
+    <!--Output text as is, except escape commas as &#44; entities for proper AsciiDoc attribute processing -->
     <xsl:value-of select="normalize-space(replace(., ',', '&#xE803;#44;'))"/>
     <xsl:text> </xsl:text>
   </xsl:for-each>
@@ -1352,7 +1345,7 @@ pass:[<xsl:copy-of select="."/>]
 <xsl:text>[options="header"]</xsl:text>
 </xsl:if>
 |===============
-<xsl:apply-templates select="descendant::row"/>
+<xsl:apply-templates select="descendant::tr"/>
 |===============
 <xsl:value-of select="util:carriage-returns(2)"/>
 </xsl:template>
@@ -1366,16 +1359,17 @@ pass:[<xsl:copy-of select="."/>]
 <xsl:value-of select="util:carriage-returns(2)"/>
 </xsl:template>
 
-<xsl:template match="row">
-  <xsl:for-each select="entry">
-    <xsl:text>|</xsl:text>
-    <xsl:apply-templates/>
+<xsl:template match="td">
+  <xsl:for-each select=".">
+    <xsl:text>| </xsl:text>
+    <xsl:value-of select="node()"/>
   </xsl:for-each>
-    <xsl:if test="not (entry/para)">
-      <xsl:value-of select="util:carriage-returns(1)"/>
-    </xsl:if>
 </xsl:template>
 
+<xsl:template match="tr">
+      <xsl:apply-templates select="td"/>
+      <xsl:value-of select="util:carriage-returns(1)"/>
+</xsl:template>
 <xsl:template match="footnote">
   <!-- When footnote has @id, output as footnoteref with @id value, 
        in case there are any corresponding footnoteref elements -->
