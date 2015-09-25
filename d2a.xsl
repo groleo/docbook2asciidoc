@@ -7,6 +7,12 @@
   
 <!-- Mapping to allow use of XML reserved chars in AsciiDoc markup elements, e.g., angle brackets for cross-references --> 
 <xsl:character-map name="xml-reserved-chars">
+  <xsl:output-character character="&#xE801;" string="&lt;"/>
+  <xsl:output-character character="&#xE802;" string="&gt;"/>
+  <xsl:output-character character="&#xE803;" string="&amp;"/>
+  <xsl:output-character character='“' string="&amp;ldquo;"/>
+  <xsl:output-character character='”' string="&amp;rdquo;"/>
+  <xsl:output-character character="’" string="&amp;rsquo;"/>
 </xsl:character-map>
 
 <xsl:output method="xml" omit-xml-declaration="yes" use-character-maps="xml-reserved-chars"/>
@@ -17,7 +23,7 @@
 <xsl:param name="add-equation-titles">false</xsl:param>
 
 <xsl:preserve-space elements="*"/>
-<xsl:strip-space elements="table row entry tgroup thead"/>
+<xsl:strip-space elements="table row entry tgroup thead listitem"/>
 
 <xsl:template match="/book">
   <xsl:choose>
@@ -28,6 +34,21 @@
       <xsl:apply-templates select="bookinfo/title"/>
     </xsl:when>
   </xsl:choose>
+  <xsl:value-of select="util:carriage-returns(1)"/>
+  <xsl:apply-templates select="bookinfo//author"/>
+  <xsl:value-of select="util:carriage-returns(1)"/>
+  <xsl:apply-templates select="bookinfo/subtitle"/>
+  <xsl:value-of select="util:carriage-returns(1)"/>
+  <xsl:text>:sectanchors:</xsl:text>
+  <xsl:value-of select="util:carriage-returns(1)"/>
+  <xsl:text>:toc: macro</xsl:text>
+  <xsl:value-of select="util:carriage-returns(2)"/>
+  <xsl:text>== About the authors</xsl:text>
+  <xsl:value-of select="util:carriage-returns(1)"/>
+  <xsl:apply-templates select="bookinfo/authorgroup"/>
+  <xsl:value-of select="util:carriage-returns(1)"/>
+  <xsl:apply-templates select="bookinfo/othercredit"/>
+  <xsl:text>toc::[]</xsl:text>
   <xsl:choose>
     <xsl:when test="$chunk-output != 'false'">
       <xsl:apply-templates select="*[not(self::title)]" mode="chunk"/>
@@ -37,7 +58,35 @@
     </xsl:otherwise>
   </xsl:choose>
 </xsl:template>
-  
+
+<xsl:template match="subtitle/text()">
+    <xsl:value-of select="replace(., '\n\s+', ' ', 'm')"/>
+</xsl:template>
+
+<xsl:template match="author">
+    <xsl:param name="separator" select="'; '"/>
+    <xsl:apply-templates select="firstname"/>
+    <xsl:text> </xsl:text>
+    <xsl:apply-templates select="surname"/>
+    <xsl:if test="position() &lt; last()"><xsl:value-of select="$separator"/></xsl:if>
+</xsl:template>
+
+<xsl:template match="authorgroup">
+    <xsl:value-of select="util:carriage-returns(1)"/>
+    <xsl:value-of select="util:carriage-returns(1)"/>
+    <xsl:apply-templates select="author" mode="full"/>
+</xsl:template>
+
+<xsl:template match="author" mode="full">
+    <xsl:text>* </xsl:text>
+    <xsl:apply-templates select="firstname"/>
+    <xsl:text> </xsl:text>
+    <xsl:apply-templates select="surname"/>
+    <xsl:text>, </xsl:text>
+    <xsl:apply-templates select="affiliation"/>
+    <xsl:value-of select="util:carriage-returns(1)"/>
+</xsl:template>
+
 <xsl:template match="//comment()">
 
 ++++++++++++++++++++++++++++++++++++++
@@ -62,7 +111,6 @@
 <xsl:template match="book/title|bookinfo/title">
   <xsl:text>= </xsl:text>
   <xsl:value-of select="."/>
-  <xsl:value-of select="util:carriage-returns(2)"/>
 </xsl:template>
 
 <xsl:template match="part" mode="chunk">
@@ -143,6 +191,16 @@
     <xsl:text>.asciidoc</xsl:text>
   </xsl:variable>
   <xsl:value-of select="util:carriage-returns(2)"/>
+  <xsl:choose>
+    <xsl:when test="self::chapter">
+      <xsl:text>:numbered:</xsl:text>
+      <xsl:value-of select="util:carriage-returns(1)"/>
+    </xsl:when>
+    <xsl:otherwise>
+      <xsl:text>:numbered!:</xsl:text>
+      <xsl:value-of select="util:carriage-returns(1)"/>
+    </xsl:otherwise>
+  </xsl:choose>
   <xsl:text>include::</xsl:text>
   <xsl:value-of select="$doc-name"/>
   <xsl:text>[]</xsl:text>
@@ -266,7 +324,64 @@
 <xsl:value-of select="replace(., '\n\s+', ' ', 'm')"/>
 </xsl:template>
 
-<!-- Strip leading whitespace from first text node in <term>, if it does not have preceding element siblings --> 
+<xsl:template match="methodname/text()">
+  <xsl:value-of select="util:carriage-returns(1)"/>
+  <xsl:text>`</xsl:text>
+  <xsl:value-of select="."/>
+  <xsl:text>`</xsl:text>
+</xsl:template>
+
+<!-- If <para> has just one text node (no element children), just normalize space in it
+<xsl:template match="para[count(element()) = 0]/text()">
+<xsl:template match="para/text()">
+  <xsl:value-of select="replace(.,'^\s+','')"/>
+<xsl:value-of select="util:carriage-returns(1)"/>
+</xsl:template>
+-->
+<!-- Strip leading whitespace from first text node in <term>, if it does not
+  have preceding element siblings -->
+<xsl:template match="para[count(element()) != 0]/text()[1][not(preceding-sibling::element())]">
+  <xsl:call-template name="strip-whitespace">
+    <xsl:with-param name="text-to-strip" select="."/>
+    <xsl:with-param name="leading-whitespace" select="'strip'"/>
+  </xsl:call-template>
+</xsl:template>
+<!-- If term has just one text node (no element children), just normalize space in it -->
+<xsl:template match="para[count(element()) = 0]/text()">
+  <xsl:value-of select="normalize-space(.)"/>
+</xsl:template>
+
+<!-- Strip trailing whitespace from last text node in <term>,
+  if it does not have following element siblings --> 
+<xsl:template match="para[count(element()) != 0]/text()[not(position() = 1)][last()][not(following-sibling::element())]">
+  <xsl:call-template name="strip-whitespace">
+    <xsl:with-param name="text-to-strip" select="."/>
+    <xsl:with-param name="trailing-whitespace" select="'strip'"/>
+  </xsl:call-template>
+</xsl:template>
+
+
+<!-- Text nodes in <term> that are between elements that contain only i
+  whitespace should be normalized to one space -->
+<xsl:template match="para/text()[not(position() = 1)][not(position() = last())][matches(., '^[\s\n]+$', 'm')]">
+  <xsl:value-of select="replace(., '^[\s\n]+$', ' ', 'm')"/>
+</xsl:template>
+
+
+
+<xsl:template match="synopsis/text()">
+<xsl:apply-templates mode="code"/>
+<xsl:value-of select="util:carriage-returns(1)"/>
+<xsl:text>----</xsl:text>
+<xsl:value-of select="util:carriage-returns(1)"/>
+  <xsl:value-of select="."/>
+<xsl:value-of select="util:carriage-returns(1)"/>
+<xsl:text>----</xsl:text>
+<xsl:value-of select="util:carriage-returns(1)"/>
+</xsl:template>
+
+<!-- Strip leading whitespace from first text node in <term>, if it does not
+  have preceding element siblings -->
 <xsl:template match="term[count(element()) != 0]/text()[1][not(preceding-sibling::element())]">
   <xsl:call-template name="strip-whitespace">
     <xsl:with-param name="text-to-strip" select="."/>
@@ -274,7 +389,8 @@
   </xsl:call-template>
 </xsl:template>
 
-<!-- Strip trailing whitespace from last text node in <term>, if it does not have following element siblings --> 
+<!-- Strip trailing whitespace from last text node in <term>,
+  if it does not have following element siblings --> 
 <xsl:template match="term[count(element()) != 0]/text()[not(position() = 1)][last()][not(following-sibling::element())]">
   <xsl:call-template name="strip-whitespace">
     <xsl:with-param name="text-to-strip" select="."/>
@@ -287,7 +403,8 @@
   <xsl:value-of select="normalize-space(.)"/>
 </xsl:template>
 
-<!-- Text nodes in <term> that are between elements that contain only whitespace should be normalized to one space -->
+<!-- Text nodes in <term> that are between elements that contain only i
+  whitespace should be normalized to one space -->
 <xsl:template match="term/text()[not(position() = 1)][not(position() = last())][matches(., '^[\s\n]+$', 'm')]">
   <xsl:value-of select="replace(., '^[\s\n]+$', ' ', 'm')"/>
 </xsl:template>
@@ -433,21 +550,21 @@
 <xsl:call-template name="process-id"/>
 === <xsl:apply-templates select="title"/>
 <xsl:value-of select="util:carriage-returns(2)"/>
-  <xsl:apply-templates select="*[not(self::title)]"/>
+  <xsl:apply-templates select="node()[not(self::title)]"/>
 </xsl:template>
 
 <xsl:template match="sect2">
 <xsl:call-template name="process-id"/>
 ==== <xsl:apply-templates select="title"/>
 <xsl:value-of select="util:carriage-returns(2)"/>
-  <xsl:apply-templates select="*[not(self::title)]"/>
+  <xsl:apply-templates select="node()[not(self::title)]"/>
 </xsl:template>
 
 <xsl:template match="sect3">
 <xsl:call-template name="process-id"/>
 ===== <xsl:apply-templates select="title"/>
 <xsl:value-of select="util:carriage-returns(2)"/>
-  <xsl:apply-templates select="*[not(self::title)]"/>
+  <xsl:apply-templates select="node()[not(self::title)]"/>
 </xsl:template>
 
 <!-- Use passthrough for sect4 and sect5, as there is no AsciiDoc markup/formatting for these -->
@@ -468,7 +585,7 @@
 </xsl:template>
 
 <!-- Use passthrough for bibliography -->
-<xsl:template match="bibliography">
+<xsl:template match="bibliography" mode="oreilly">
 ++++++++++++++++++++++++++++++++++++++
 <xsl:choose>
   <xsl:when test="$strip-indexterms='false'">
@@ -482,6 +599,75 @@
   </xsl:otherwise>
 </xsl:choose>
 ++++++++++++++++++++++++++++++++++++++
+</xsl:template>
+
+<xsl:template match="bibliography">
+    <xsl:text>[bibliography]</xsl:text>
+    <xsl:value-of select="util:carriage-returns(1)"/>
+    <xsl:text>== </xsl:text>
+    <xsl:value-of select="title"/>
+    <xsl:value-of select="util:carriage-returns(2)"/>
+    <xsl:apply-templates select="bibliodiv"/>
+</xsl:template>
+
+<xsl:template match="bibliodiv">
+    <xsl:text>=== </xsl:text>
+    <xsl:value-of select="title"/>
+    <xsl:value-of select="util:carriage-returns(2)"/>
+    <xsl:apply-templates select="biblioentry"/>
+</xsl:template>
+
+<xsl:template match="biblioentry">
+    <xsl:text>- [[[</xsl:text>
+    <xsl:value-of select="@id"/>
+    <xsl:text>]]] </xsl:text>
+    <xsl:if test="biblioset">
+        <xsl:apply-templates select="biblioset"/>
+    </xsl:if>
+    <xsl:if test="title">
+        <xsl:apply-templates select="title"/>
+        <xsl:text>. </xsl:text>
+    </xsl:if>
+    <xsl:if test="bibliosource">
+        <xsl:apply-templates select="bibliosource"/>
+        <xsl:text>. </xsl:text>
+    </xsl:if>
+    <xsl:if test="publisher">
+        <xsl:apply-templates select="publisher"/>
+        <xsl:text>. </xsl:text>
+    </xsl:if>
+    <xsl:if test="authorgroup">
+        <xsl:apply-templates select="authorgroup/author">
+            <xsl:with-param name="separator">, </xsl:with-param>
+        </xsl:apply-templates>
+        <xsl:text>. </xsl:text>
+    </xsl:if>
+    <xsl:if test="date">
+        <xsl:apply-templates select="date"/>
+        <xsl:text>.</xsl:text>
+    </xsl:if>
+    <xsl:value-of select="util:carriage-returns(1)"/>
+</xsl:template>
+
+<xsl:template match="biblioset[@relation='article']">
+    <xsl:apply-templates select="authorgroup/author">
+        <xsl:with-param name="separator">, </xsl:with-param>
+    </xsl:apply-templates>
+    <xsl:text>. </xsl:text>
+    <xsl:apply-templates select="date"/>
+    <xsl:text>. </xsl:text>
+    <xsl:text>“</xsl:text>
+    <xsl:apply-templates select="title"/>
+    <xsl:text>”</xsl:text>
+    <xsl:text>. </xsl:text>
+    <xsl:text>__</xsl:text>
+    <xsl:apply-templates select="biblioset/title"/>
+    <xsl:text>__</xsl:text>
+    <xsl:text>. </xsl:text>
+    <xsl:apply-templates select="biblioset/volumenum"/>
+    <xsl:text>. </xsl:text>
+    <xsl:apply-templates select="pagenums"/>
+    <xsl:text>.</xsl:text>
 </xsl:template>
 
 <!-- Use passthrough for reference sections -->
@@ -587,7 +773,7 @@
 <xsl:if test="ancestor::listitem and preceding-sibling::element()">
   <xsl:choose>
   <xsl:when test="not(ancestor::warning|ancestor::note|ancestor::caution|ancestor::tip|ancestor::important) and not(ancestor::sidebar)">
-    <xsl:text>+</xsl:text><xsl:value-of select="util:carriage-returns(1)"/>
+    <xsl:text> </xsl:text><xsl:value-of select="util:carriage-returns(1)"/>
   </xsl:when>
   <xsl:otherwise>
     <xsl:value-of select="util:carriage-returns(1)"/>
@@ -633,7 +819,8 @@
   <!-- Simple processing of attribution elements, placing a space between each
        and skipping <citetitle>, which is handled separately below -->
   <xsl:for-each select="attribution/text()|attribution//*[not(*)][not(self::citetitle)]">
-    <!--Output text as is, except escape commas as &#44; entities for proper AsciiDoc attribute processing -->
+    <!--Output text as is, except escape commas as &#44; entities for 
+	proper AsciiDoc attribute processing -->
     <xsl:value-of select="normalize-space(replace(., ',', '&#xE803;#44;'))"/>
     <xsl:text> </xsl:text>
   </xsl:for-each>
@@ -691,9 +878,9 @@ ____
 <!-- BEGIN INLINE MARKUP HANDLING -->
 <xsl:template match="phrase"><xsl:apply-templates /></xsl:template>
 
-<xsl:template match="emphasis[@role='bold']">*<xsl:apply-templates />*</xsl:template>
+<xsl:template match="emphasis[@role='bold']|emphasis[@role='strong']">**<xsl:apply-templates />**</xsl:template>
 
-  <xsl:template match="filename">_<xsl:if test="(preceding-sibling::text()[matches(., '\S$')]) or (following-sibling::text()[1][matches(., '^\S.*?') and not(matches(., '^\..*?')) and not(matches(., '^,.*?'))])">_</xsl:if><xsl:if test="contains(., '~') or contains(., '_')">$$</xsl:if><xsl:apply-templates/><xsl:if test="contains(., '~') or contains(., '_')">$$</xsl:if>_<xsl:if test="(preceding-sibling::text()[matches(., '\S$')]) or (following-sibling::text()[1][matches(., '^\S.*?') and not(matches(., '^\..*?')) and not(matches(., '^,.*?'))])">_</xsl:if><xsl:if test="not(following-sibling::node()[1][self::userinput]) and matches(following-sibling::node()[1], '^[a-zA-Z]')"><xsl:text> </xsl:text></xsl:if></xsl:template>
+  <xsl:template match="filename">__<xsl:if test="contains(., '~') or contains(., '_')">$$</xsl:if><xsl:apply-templates/><xsl:if test="contains(., '~') or contains(., '_')">$$</xsl:if>__</xsl:template>
   <!-- Normalize-space() on text node below includes extra handling for child elements of filename, to add needed spaces back in. (They're removed by normalize-space(), which normalizes the two text nodes separately.) -->
   <xsl:template match="filename/text()">
     <xsl:if test="preceding-sibling::* and (starts-with(.,' ') or starts-with(.,'&#10;'))">
@@ -705,7 +892,7 @@ ____
     </xsl:if>
   </xsl:template>
 
-  <xsl:template match="emphasis">_<xsl:if test="(preceding-sibling::text()[matches(., '\S$')]) or (following-sibling::text()[1][matches(., '^\S.*?') and not(matches(., '^\..*?')) and not(matches(., '^,.*?'))])">_</xsl:if><xsl:if test="contains(., '~') or contains(., '_')">$$</xsl:if><xsl:apply-templates/><xsl:if test="contains(., '~') or contains(., '_')">$$</xsl:if>_<xsl:if test="(preceding-sibling::text()[matches(., '\S$')]) or (following-sibling::text()[1][matches(., '^\S.*?') and not(matches(., '^\..*?')) and not(matches(., '^,.*?'))])">_</xsl:if><xsl:if test="not(following-sibling::node()[1][self::userinput]) and not(following-sibling::node()[1][self::indexterm]) and matches(following-sibling::node()[1], '^[a-zA-Z]')"><xsl:text> </xsl:text></xsl:if></xsl:template>
+  <xsl:template match="emphasis">__<xsl:if test="contains(., '~') or contains(., '_')">$$</xsl:if><xsl:apply-templates/><xsl:if test="contains(., '~') or contains(., '_')">$$</xsl:if>__</xsl:template>
   <!-- Normalize-space() on text node below includes extra handling for child elements of emphasis, to add needed spaces back in. (They're removed by normalize-space(), which normalizes the two text nodes separately.) -->
   <xsl:template match="emphasis/text()">
     <xsl:if test="preceding-sibling::* and (starts-with(.,' ') or starts-with(.,'&#10;'))">
@@ -717,7 +904,7 @@ ____
     </xsl:if>
   </xsl:template>
 
-  <xsl:template match="command">_<xsl:if test="(preceding-sibling::text()[matches(., '\S$')]) or (following-sibling::text()[1][matches(., '^\S.*?') and not(matches(., '^\..*?')) and not(matches(., '^,.*?'))])">_</xsl:if><xsl:if test="contains(., '~') or contains(., '_')">$$</xsl:if><xsl:apply-templates/><xsl:if test="contains(., '~') or contains(., '_')">$$</xsl:if>_<xsl:if test="(preceding-sibling::text()[matches(., '\S$')]) or (following-sibling::text()[1][matches(., '^\S.*?') and not(matches(., '^\..*?')) and not(matches(., '^,.*?'))])">_</xsl:if><xsl:if test="not(following-sibling::node()[1][self::userinput]) and matches(following-sibling::node()[1], '^[a-zA-Z]')"><xsl:text> </xsl:text></xsl:if></xsl:template>
+  <xsl:template match="command">__<xsl:if test="contains(., '~') or contains(., '_')">$$</xsl:if><xsl:apply-templates/><xsl:if test="contains(., '~') or contains(., '_')">$$</xsl:if>__</xsl:template>
   <!-- Normalize-space() on text node below includes extra handling for child elements of command, to add needed spaces back in. (They're removed by normalize-space(), which normalizes the two text nodes separately.) -->
   <xsl:template match="command/text()">
     <xsl:if test="preceding-sibling::* and (starts-with(.,' ') or starts-with(.,'&#10;'))">
@@ -729,7 +916,8 @@ ____
     </xsl:if>
   </xsl:template>
 
-  <xsl:template match="literal | code"><xsl:if test="preceding-sibling::node()[1][self::replaceable] or following-sibling::node()[1][self::replaceable] or child::replaceable or following-sibling::node()[1][self::emphasis] or preceding-sibling::text()[matches(., '\S$')] or (following-sibling::text()[1][matches(., '^\S.*?') and not(matches(., '^\..*?')) and not(matches(., '^,.*?'))])">+</xsl:if>+<xsl:if test='contains(., "+") or contains(., "&apos;") or contains(., "_")'>$$</xsl:if><xsl:apply-templates/><xsl:if test='contains(., "+") or contains(., "&apos;") or contains(., "_")'>$$</xsl:if>+<xsl:if test="preceding-sibling::node()[1][self::replaceable] or following-sibling::node()[1][self::replaceable] or child::replaceable or following-sibling::node()[1][self::emphasis] or preceding-sibling::text()[matches(., '\S$')] or (following-sibling::text()[1][matches(., '^\S.*?') and not(matches(., '^\..*?')) and not(matches(., '^,.*?'))])">+</xsl:if></xsl:template>
+  <xsl:template match="literal | code">++<xsl:if test='contains(., "+") or contains(., "&apos;") or contains(., "_")'>$$</xsl:if><xsl:apply-templates/><xsl:if test='contains(., "+") or contains(., "&apos;") or contains(., "_")'>$$</xsl:if>++</xsl:template>
+
   <xsl:template match="literal/text()"><xsl:value-of select="replace(replace(replace(., '\n\s+', ' ', 'm'), 'C\+\+', '\$\$C++\$\$', 'm'), '([\[\]\*\^~])', '\\$1', 'm')"></xsl:value-of></xsl:template>
   
 <xsl:template match="userinput">**`<xsl:apply-templates />`**</xsl:template>
@@ -746,7 +934,7 @@ ____
 
 <xsl:template match="replaceable"><xsl:choose>
   <xsl:when test="parent::literal">__<xsl:apply-templates />__</xsl:when>
-  <xsl:otherwise>_++<xsl:apply-templates />++_</xsl:otherwise>
+  <xsl:otherwise>__++<xsl:apply-templates />++__</xsl:otherwise>
 </xsl:choose></xsl:template>
   <!-- Normalize-space() on text node below includes extra handling for child elements of replaceable, to add needed spaces back in. (They're removed by normalize-space(), which normalizes the two text nodes separately.) -->
   <xsl:template match="replaceable/text()">
@@ -1275,11 +1463,11 @@ pass:[<xsl:copy-of select="."/>]
   <xsl:template match="calloutlist">
     <xsl:choose>
       <!-- Calloutlist points to an example -->
-      <xsl:when test="callout/@arearefs/ancestor::example">
+      <xsl:when test="callout/id(@arearefs)/ancestor::example">
         <xsl:choose>
           <!-- When corresponding code block has inlines (besides co) and will be output as Docbook passthrough,
           also output calloutlist as Docbook passthrough-->
-          <xsl:when test="callout/id/@arearefs/parent::*[*[not(self::co)]]">
+          <xsl:when test="callout/id(@arearefs)/parent::*[*[not(self::co)]]">
 ++++++++++++++++++++++++++++++++++++++
 <xsl:copy-of select="."/>
 ++++++++++++++++++++++++++++++++++++++
@@ -1287,7 +1475,7 @@ pass:[<xsl:copy-of select="."/>]
 </xsl:when>
           <!-- When corresponding code block isn't in same section as calloutlist and will be output as Docbook passthrough,
           also output calloutlist as Docbook passthrough.-->
-          <xsl:when test="callout/id/@arearefs/parent::*/parent::example/parent::node() != self::calloutlist/parent::node()">
+          <xsl:when test="callout/id(@arearefs)/parent::*/parent::example/parent::node() != self::calloutlist/parent::node()">
 ++++++++++++++++++++++++++++++++++++++
 <xsl:copy-of select="."/>
 ++++++++++++++++++++++++++++++++++++++
@@ -1345,7 +1533,12 @@ pass:[<xsl:copy-of select="."/>]
 <xsl:text>[options="header"]</xsl:text>
 </xsl:if>
 |===============
-<xsl:apply-templates select="descendant::tr"/>
+<xsl:if test="descendant::row">
+ <xsl:apply-templates select="descendant::row"/>
+</xsl:if>
+<xsl:if test="descendant::tr">
+ <xsl:apply-templates select="descendant::tr"/>
+</xsl:if>
 |===============
 <xsl:value-of select="util:carriage-returns(2)"/>
 </xsl:template>
@@ -1361,15 +1554,26 @@ pass:[<xsl:copy-of select="."/>]
 
 <xsl:template match="td">
   <xsl:for-each select=".">
-    <xsl:text>| </xsl:text>
+    <xsl:text> |</xsl:text>
     <xsl:value-of select="node()"/>
-  </xsl:for-each>
+   </xsl:for-each>
 </xsl:template>
 
 <xsl:template match="tr">
       <xsl:apply-templates select="td"/>
+       <xsl:value-of select="util:carriage-returns(1)"/>
+ </xsl:template>
+
+<xsl:template match="row">
+  <xsl:for-each select="entry">
+    <xsl:text> |</xsl:text>
+    <xsl:apply-templates/>
+  </xsl:for-each>
+    <xsl:if test="not (entry/para)">
       <xsl:value-of select="util:carriage-returns(1)"/>
+    </xsl:if>
 </xsl:template>
+
 <xsl:template match="footnote">
   <!-- When footnote has @id, output as footnoteref with @id value, 
        in case there are any corresponding footnoteref elements -->
@@ -1393,11 +1597,19 @@ pass:[<xsl:copy-of select="."/>]
 </xsl:template>
 
 <xsl:template match="section">
+  <xsl:value-of select="util:carriage-returns(2)"/>
   <xsl:call-template name="process-id"/>
-  <xsl:sequence select="string-join (('&#10;&#10;', for $i in (1 to count (ancestor::section) + 3) return '='),'')"/>
+  <xsl:sequence select="string-join ((for $i in (1 to count (ancestor::section) + 3) return '='),'')"/>
+  <xsl:text> </xsl:text>
   <xsl:apply-templates select="title"/>
   <xsl:value-of select="util:carriage-returns(2)"/>
   <xsl:apply-templates select="*[not(self::title)]"/>
+</xsl:template>
+
+<xsl:template match="varname|computeroutput">
+    <xsl:text>[x-]`</xsl:text>
+    <xsl:apply-templates/>
+    <xsl:text>`</xsl:text>
 </xsl:template>
 
 <!-- Utility functions/templates -->
@@ -1448,5 +1660,14 @@ pass:[<xsl:copy-of select="."/>]
 </xsl:template>
 
 <xsl:template match="indexterm" mode="copy-and-drop-indexterms"/>
+
+<xsl:template match="biblioref">
+    <xsl:text>[&#xE801;&#xE801;</xsl:text>
+    <xsl:variable name="linkend" select="string(@linkend)"/>
+    <xsl:value-of select="$linkend"/>
+    <xsl:text>,</xsl:text>
+    <xsl:value-of select="/book/bibliography//biblioentry[@id=$linkend]/abbrev"/>
+    <xsl:text>&#xE802;&#xE802;]</xsl:text>
+</xsl:template>
 
 </xsl:stylesheet>
